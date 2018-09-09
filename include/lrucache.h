@@ -1,6 +1,6 @@
-#include <unordered_map>
 #include <utility>
 #include <memory>
+#include <unordered_map>
 #ifndef _LYN_LRU_CACHE
 #define _LYN_LRU_CACHE
 namespace cache{ 
@@ -29,12 +29,14 @@ class lru_cache{
         std::unordered_map<key_t, node_ptr_t> _cache;
         int _max_size;
 
+
     public:
         int _current_size;
-        lru_cache(int max_size): _max_size(max_size), head(nullptr), tail(nullptr, _current_size(0)){}
+        lru_cache(int max_size): _max_size(max_size), head(nullptr), tail(nullptr), _current_size(0){}
         bool set(key_t k, value_t v){
             bool res;
-            node_ptr_t n = std::make_shared<node_t>((std::make_pair(k, v)));
+            kv_pair_t t = std::make_pair(k, v);
+            node_ptr_t n = std::make_shared<node_t>(t);
             _cache[k] = n;
             if(head == nullptr){
                 head = n;
@@ -47,7 +49,7 @@ class lru_cache{
             _current_size++;
 
             if(_current_size  == _max_size){
-                res = _cache.erase(tail->value.first());
+                res = _cache.erase(tail->node_value.first);
                 tail = tail->last;
                 tail->next = nullptr;
             }
@@ -59,14 +61,23 @@ class lru_cache{
             if(it == _cache.cend()){
                 throw std::range_error("No such key in cache");
             }
-            const auto p = *it;
+            const node_ptr_t p = it->second;
             const node_ptr_t last = p->last;
-            last->next = p->next;
+            if(last == nullptr){
+                return  std::move(p->node_value.second);
+            }
+
+            const node_ptr_t next = p->next;
+            if(next == nullptr){
+                last->next = nullptr;
+            }else{
+                last->next = next;
+                next->last = last;
+            }
+
             p->next = head;
-            p->last = p;
-            p->last = nullptr;
-            head = p;
-            return std::move(p->value.second());
+            head->last = p;
+            return std::move(p->node_value.second);
         }
         void clear(){
             head = nullptr;
@@ -74,6 +85,7 @@ class lru_cache{
             _current_size = 0;
             _cache.clear();
         }
+
         size_t size(){
             return _cache.size();
         }
